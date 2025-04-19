@@ -1,0 +1,10 @@
+torchvision~=0.21.0
+pillow~=11.2.1
+numpy~=2.2.4
+torch~=2.6.0
+scipy~=1.15.2
+scikit-image~=0.25.0
+blobfile~=3.0.0
+mpi4py~=3.1.4
+opencv-python~=4.11.0.86
+tensorflow-probability~=0.25.0
