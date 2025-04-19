@@ -1,0 +1,23 @@
+#!/bin/bash
+
+## Download and install Miniconda
+#MINICONDA_INSTALLER=Miniconda3-latest-Linux-x86_64.sh
+#wget https://repo.anaconda.com/miniconda/$MINICONDA_INSTALLER -O ~/miniconda.sh
+#bash ~/miniconda.sh -b -p $HOME/miniconda
+#export PATH="$HOME/miniconda/bin:$PATH"
+
+# Initialize Conda and create a new environment
+#conda init
+#source ~/.bashrc
+
+conda create -n SinDiffusion python=3.11 -y
+conda activate SinDiffusion
+
+# Install MPI
+sudo apt update
+sudo apt install -y libopenmpi-dev openmpi-bin
+
+# Install related dependencies
+pip install -r requirements.txt
+
+echo "Installation completed!"
