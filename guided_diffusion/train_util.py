@@ -15,6 +15,8 @@ from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
+import ImageReward as RewardModel
+import torchvision.utils as vutils
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -74,6 +76,8 @@ class TrainLoop:
             use_fp16=self.use_fp16,
             fp16_scale_growth=fp16_scale_growth,
         )
+        self.reward_model = RewardModel.load("ImageReward-v1.0")
+        self.prompt = "a photo of john curtin school of medical research"
 
         self.opt = AdamW(
             self.mp_trainer.master_params, lr=self.lr, weight_decay=self.weight_decay
@@ -221,6 +225,42 @@ class TrainLoop:
                 )
 
             loss = (losses["loss"] * weights).mean()
+
+            RL = True
+            alpha = 0.1
+            if RL:
+                # Generate a complete image
+                with th.no_grad():
+                    sample = self.diffusion.p_sample_loop(
+                        self.ddp_model,
+                        (1, 3, micro.shape[2], micro.shape[3]),
+                        device=dist_util.dev(),
+                        progress=False
+                    )
+                    x_gen = sample[0]
+
+                # Save the image
+                save_path = f"generated_imgs/step_{self.step}.png"
+                vutils.save_image(x_gen, save_path)
+
+                # Get the reward
+                # reward = self.reward_model(x_gen, self.prompt)
+                reward = self.reward_model.score(self.prompt, x_gen)
+                print(f"Step {self.step} - Reward: {reward:.4f}, Saved to: {save_path}")
+
+                reward = th.tensor(reward).to(dist_util.dev())
+
+                # # === 3. 构建 proxy log_prob（MSE loss 作为 proxy）===
+                # pred_noise = losses["pred_xstart"]
+                # true_noise = losses["target"]
+                # log_prob_proxy = -F.mse_loss(pred_noise, true_noise.detach(), reduction="mean")
+                #
+                # # === 4. 构建 RL loss ===
+                # rl_loss = -reward * log_prob_proxy
+                #
+                # # === 5. 总 loss ===
+                # loss += alpha * rl_loss
+
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
             )
