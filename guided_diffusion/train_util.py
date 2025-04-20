@@ -202,9 +202,6 @@ class TrainLoop:
             last_batch = (i + self.microbatch) >= batch.shape[0]
             t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
 
-            # origin_h = micro.shape[2]
-            # origin_w = micro.shape[3]
-
             # random resize
             if MPI.COMM_WORLD.Get_rank() == 0:
                 curr_h = round(micro.shape[2] * random.uniform(0.75, 1.25))
@@ -240,7 +237,8 @@ class TrainLoop:
             if self.RL and self.step > 0:
 
                 start_sample_time = time.time()
-                # Generate a complete image
+
+                # Generate and save a complete image
                 with th.no_grad():
                     sample = self.diffusion.p_sample_loop(
                         self.ddp_model,
@@ -250,8 +248,6 @@ class TrainLoop:
                         progress=False
                     )
                     x_gen = sample[0]
-
-                # Save the image
                 os.makedirs("generated_imgs", exist_ok=True)
                 save_path = f"generated_imgs/step_{self.step}.png"
                 vutils.save_image(x_gen * 0.5 + 0.5, save_path)
@@ -266,16 +262,7 @@ class TrainLoop:
 
                 reward = th.tensor(reward).to(dist_util.dev())
 
-                # # === 3. 构建 proxy log_prob（MSE loss 作为 proxy）===
-                # pred_noise = losses["pred_xstart"]
-                # true_noise = losses["target"]
-                # log_prob_proxy = -F.mse_loss(pred_noise, true_noise.detach(), reduction="mean")
-                #
-                # # === 4. 构建 RL loss ===
-                # rl_loss = -reward * log_prob_proxy
-                #
-                # # === 5. 总 loss ===
-                # loss += alpha * rl_loss
+                loss = loss + self.alpha * reward.mean()
 
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
