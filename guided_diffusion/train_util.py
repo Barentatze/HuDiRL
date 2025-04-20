@@ -250,7 +250,8 @@ class TrainLoop:
 
                 # Get the reward
                 # reward = self.reward_model(x_gen, self.prompt)
-                reward = self.reward_model.score(self.prompt, x_gen)
+                # reward = self.reward_model.score(self.prompt, x_gen)
+                reward = self.reward_model.score(self.prompt, save_path)
                 print(f"Step {self.step} - Reward: {reward:.4f}, Saved to: {save_path}")
 
                 reward = th.tensor(reward).to(dist_util.dev())
