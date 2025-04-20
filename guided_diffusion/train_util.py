@@ -3,6 +3,8 @@ import functools
 import os
 
 import random
+import time
+
 import blobfile as bf
 import torch as th
 import torch.distributed as dist
@@ -44,6 +46,8 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        using_rl=True,
+        alpha=0.1
     ):
         self.model = model
         self.diffusion = diffusion
@@ -68,6 +72,8 @@ class TrainLoop:
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size * dist.get_world_size()
+        self.RL = using_rl
+        self.alpha = alpha
 
         self.sync_cuda = th.cuda.is_available()
 
@@ -227,10 +233,10 @@ class TrainLoop:
 
             loss = (losses["loss"] * weights).mean()
 
-            RL = True
-            alpha = 0.1
             model_kwargs = {}
-            if RL:
+            if self.RL:
+
+                start_sample_time = time.time()
                 # Generate a complete image
                 with th.no_grad():
                     sample = self.diffusion.p_sample_loop(
@@ -245,14 +251,15 @@ class TrainLoop:
                 # Save the image
                 os.makedirs("generated_imgs", exist_ok=True)
                 save_path = f"generated_imgs/step_{self.step}.png"
-                # vutils.save_image(x_gen, save_path)
                 vutils.save_image(x_gen * 0.5 + 0.5, save_path)
 
+                end_sample_time = time.time()
+
                 # Get the reward
-                # reward = self.reward_model(x_gen, self.prompt)
-                # reward = self.reward_model.score(self.prompt, x_gen)
                 reward = self.reward_model.score(self.prompt, save_path)
-                print(f"Step {self.step} - Reward: {reward:.4f}, Saved to: {save_path}")
+
+                end_reward_time = time.time()
+                print(f"Step {self.step} - Reward: {reward:.4f}, Saved to: {save_path}, Time for sampling: {end_sample_time - start_sample_time:.4f} seconds, Time for reward: {end_reward_time - end_sample_time:.4f} seconds")
 
                 reward = th.tensor(reward).to(dist_util.dev())
 
