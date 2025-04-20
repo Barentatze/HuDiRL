@@ -228,12 +228,14 @@ class TrainLoop:
 
             RL = True
             alpha = 0.1
+            model_kwargs = {}
             if RL:
                 # Generate a complete image
                 with th.no_grad():
                     sample = self.diffusion.p_sample_loop(
                         self.ddp_model,
                         (1, 3, micro.shape[2], micro.shape[3]),
+                        model_kwargs=model_kwargs,
                         device=dist_util.dev(),
                         progress=False
                     )
