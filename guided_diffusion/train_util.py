@@ -242,6 +242,7 @@ class TrainLoop:
                     x_gen = sample[0]
 
                 # Save the image
+                os.makedirs("generated_imgs", exist_ok=True)
                 save_path = f"generated_imgs/step_{self.step}.png"
                 vutils.save_image(x_gen, save_path)
 
