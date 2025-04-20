@@ -202,6 +202,9 @@ class TrainLoop:
             last_batch = (i + self.microbatch) >= batch.shape[0]
             t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
 
+            origin_h = micro.shape[2]
+            origin_w = micro.shape[3]
+
             # random resize
             if MPI.COMM_WORLD.Get_rank() == 0:
                 curr_h = round(micro.shape[2] * random.uniform(0.75, 1.25))
@@ -241,7 +244,7 @@ class TrainLoop:
                 with th.no_grad():
                     sample = self.diffusion.p_sample_loop(
                         self.ddp_model,
-                        (1, 3, micro.shape[2], micro.shape[3]),
+                        (1, 3, origin_h, origin_w),
                         model_kwargs=model_kwargs,
                         device=dist_util.dev(),
                         progress=False
