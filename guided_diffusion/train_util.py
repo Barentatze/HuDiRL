@@ -41,7 +41,6 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
-        gen_size,
         use_fp16=False,
         fp16_scale_growth=1e-3,
         schedule_sampler=None,
@@ -75,7 +74,6 @@ class TrainLoop:
         self.global_batch = self.batch_size * dist.get_world_size()
         self.RL = using_rl
         self.alpha = alpha
-        self.gen_size = gen_size
 
         self.sync_cuda = th.cuda.is_available()
 
@@ -236,14 +234,14 @@ class TrainLoop:
             loss = (losses["loss"] * weights).mean()
 
             model_kwargs = {}
-            if self.RL and self.step > 200:
+            if self.RL and self.step > 0:
 
                 start_sample_time = time.time()
                 # Generate a complete image
                 with th.no_grad():
                     sample = self.diffusion.p_sample_loop(
                         self.ddp_model,
-                        (1, 3, self.gen_size[0], self.gen_size[1]),
+                        (1, 3, micro.shape[2], micro.shape[3]),
                         model_kwargs=model_kwargs,
                         device=dist_util.dev(),
                         progress=False

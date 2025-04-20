@@ -70,7 +70,6 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
-        gen_size= (round(args.full_size[0] * scale_factor), round(args.full_size[1] * scale_factor))
     ).run_loop()
 
 
