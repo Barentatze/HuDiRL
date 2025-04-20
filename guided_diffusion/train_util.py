@@ -234,7 +234,7 @@ class TrainLoop:
             loss = (losses["loss"] * weights).mean()
 
             model_kwargs = {}
-            if self.RL:
+            if self.RL and self.step > 2000:
 
                 start_sample_time = time.time()
                 # Generate a complete image
