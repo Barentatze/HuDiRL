@@ -17,6 +17,7 @@ from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 import ImageReward as RewardModel
 import torchvision.utils as vutils
+import torchvision as tv
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -244,7 +245,8 @@ class TrainLoop:
                 # Save the image
                 os.makedirs("generated_imgs", exist_ok=True)
                 save_path = f"generated_imgs/step_{self.step}.png"
-                vutils.save_image(x_gen, save_path)
+                # vutils.save_image(x_gen, save_path)
+                vutils.save_image(x_gen * 0.5 + 0.5, save_path)
 
                 # Get the reward
                 # reward = self.reward_model(x_gen, self.prompt)
