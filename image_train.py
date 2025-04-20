@@ -52,6 +52,7 @@ def main():
         current_scale=args.stop_scale
     )
 
+    scale_factor = 0.5
     logger.log("training...")
     TrainLoop(
         model=model,
@@ -69,6 +70,7 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        gen_size= (args.image_size[0] * scale_factor, args.image_size[1] * scale_factor)
     ).run_loop()
 
 
