@@ -234,7 +234,9 @@ class TrainLoop:
             loss = (losses["loss"] * weights).mean()
 
             model_kwargs = {}
-            if self.RL and self.step > 5000 and self.step % 100 == 0:
+
+            if self.step > 5000 and self.step % 100 == 0:
+            # if self.RL:
 
                 start_sample_time = time.time()
 
@@ -262,7 +264,8 @@ class TrainLoop:
 
                 reward = th.tensor(reward).to(dist_util.dev())
 
-                loss = loss + self.alpha * reward.mean()
+                if self.RL:
+                    loss = loss + self.alpha * reward.mean()
 
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
