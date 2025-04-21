@@ -234,7 +234,7 @@ class TrainLoop:
             loss = (losses["loss"] * weights).mean()
 
             model_kwargs = {}
-            if self.RL and self.step > 5000:
+            if self.RL and self.step > 5000 and self.step % 100 == 0:
 
                 start_sample_time = time.time()
 
