@@ -311,7 +311,7 @@ class TrainLoop:
                     avg_critic_loss = sum(critic_losses) / len(critic_losses)
                     with open(self.critic_losses_file, 'a', newline='') as f:
                         writer = csv.writer(f)
-                        writer.writerow([self.step, avg_critic_loss.item()])
+                        writer.writerow([self.step, avg_critic_loss])
 
                     self.critic.eval()
 
