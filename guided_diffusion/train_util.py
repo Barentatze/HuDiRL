@@ -260,7 +260,7 @@ class TrainLoop:
                     reward = self.critic(model_output)
                 end_critic_time = time.time()
                 # reward = th.tensor(reward).to(dist_util.dev())
-                print(f"Step {self.step} - Critic Reward: {reward:.4f}, Time for critic: {end_critic_time - start_critic_time:.4f} seconds")
+                print(f"Step {self.step} - Critic Reward: {reward.item():.4f}, Time for critic: {end_critic_time - start_critic_time:.4f} seconds")
 
                 loss = loss + self.alpha * reward
                 # loss = (1 - self.alpha) * loss + self.alpha * reward
@@ -301,7 +301,7 @@ class TrainLoop:
                         critic_loss = F.mse_loss(predicted_reward, actual_reward)
                         critic_losses.append(critic_loss.item())
 
-                        print(f"Step {self.step}_{i} - Critic Reward: {critic_loss.item():.4f}, Time for training: {end_training_time - start_training_time:.4f} seconds")
+                        print(f"Step {self.step}_{i} - Critic Loss: {critic_loss.item():.4f}, Time for training: {end_training_time - start_training_time:.4f} seconds")
 
                         self.critic_optimizer.zero_grad()
                         critic_loss.backward()
