@@ -1,4 +1,5 @@
 import copy
+import csv
 import functools
 import os
 
@@ -9,6 +10,7 @@ import blobfile as bf
 import torch as th
 import torch.distributed as dist
 import torch.nn.functional as F
+from timm.models import AvgPool2dSame
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from mpi4py import MPI
@@ -20,6 +22,7 @@ from .resample import LossAwareSampler, UniformSampler
 import ImageReward as RewardModel
 import torchvision.utils as vutils
 import torchvision as tv
+from guided_diffusion.critic import RewardPredictor
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -29,26 +32,30 @@ INITIAL_LOG_LOSS_SCALE = 20.0
 
 class TrainLoop:
     def __init__(
-        self,
-        *,
-        model,
-        diffusion,
-        data,
-        batch_size,
-        microbatch,
-        lr,
-        ema_rate,
-        log_interval,
-        save_interval,
-        resume_checkpoint,
-        use_fp16=False,
-        fp16_scale_growth=1e-3,
-        schedule_sampler=None,
-        weight_decay=0.0,
-        lr_anneal_steps=0,
-        using_rl=True,
-        alpha=0.1,
+            self,
+            *,
+            model,
+            diffusion,
+            data,
+            batch_size,
+            microbatch,
+            lr,
+            ema_rate,
+            log_interval,
+            save_interval,
+            resume_checkpoint,
+            use_fp16=False,
+            fp16_scale_growth=1e-3,
+            schedule_sampler=None,
+            weight_decay=0.0,
+            lr_anneal_steps=0,
+            using_rl=True,
+            alpha=0.5,
+            rl_Pool2dSize=16,
+            rl_H=128,
+            rl_W=128,
     ):
+        self.critic_losses_file = "critic_losses.csv"
         self.model = model
         self.diffusion = diffusion
         self.data = data
@@ -74,6 +81,10 @@ class TrainLoop:
         self.global_batch = self.batch_size * dist.get_world_size()
         self.RL = using_rl
         self.alpha = alpha
+        self.timestep = 50
+        self.rl_H, self.rl_W = rl_H, rl_W
+        self.critic = RewardPredictor(Pool2dSize=rl_Pool2dSize)
+        self.critic_optimizer = th.optim.Adam(self.critic.parameters(), lr=1e-4)
 
         self.sync_cuda = th.cuda.is_available()
 
@@ -166,8 +177,8 @@ class TrainLoop:
 
     def run_loop(self):
         while (
-            not self.lr_anneal_steps
-            or self.step + self.resume_step < self.lr_anneal_steps
+                not self.lr_anneal_steps
+                or self.step + self.resume_step < self.lr_anneal_steps
         ):
             batch, cond = next(self.data)
             self.run_step(batch, cond)
@@ -193,10 +204,12 @@ class TrainLoop:
 
     def forward_backward(self, batch, cond):
         self.mp_trainer.zero_grad()
+        self.critic.to(dist_util.dev())
+        self.critic.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
-            micro = batch[i : i + self.microbatch].to(dist_util.dev())
+            micro = batch[i: i + self.microbatch].to(dist_util.dev())
             micro_cond = {
-                k: v[i : i + self.microbatch].to(dist_util.dev())
+                k: v[i: i + self.microbatch].to(dist_util.dev())
                 for k, v in cond.items()
             }
             last_batch = (i + self.microbatch) >= batch.shape[0]
@@ -233,54 +246,92 @@ class TrainLoop:
 
             loss = (losses["loss"] * weights).mean()
 
-            model_kwargs = {}
-
-            # if self.step > 5000 and self.step % 100 == 0:
             if self.RL:
-                timestep = 50
-                H, W = 32, 32
-                t = th.tensor([timestep], device=dist_util.dev())
-                x_t = th.randn((1, 3, H, W), device=dist_util.dev())
+                self.critic.eval()
+                start_critic_time = time.time()
+                t = th.tensor([self.timestep], device=dist_util.dev())
+                x_t = th.randn((1, 3, self.rl_H, self.rl_W), device=dist_util.dev())
                 model_kwargs = {}
 
                 with th.no_grad():
-                    model_output = self.ddp_model(x_t, t, **model_kwargs)
+                    model_output = self.ddp_model(x_t, t, **model_kwargs)  # Generate a diffusion step
 
-                print(model_output.shape)
-
-                # start_sample_time = time.time()
-                #
-                # # Generate and save a complete image
-                # with th.no_grad():
-                #     sample = self.diffusion.p_sample_loop(
-                #         self.ddp_model,
-                #         (1, 3, curr_h, curr_w),
-                #         model_kwargs=model_kwargs,
-                #         device=dist_util.dev(),
-                #         progress=False
-                #     )
-                #     x_gen = sample[0]
-                # os.makedirs("generated_imgs", exist_ok=True)
-                # save_path = f"generated_imgs/step_{self.step}.png"
-                # vutils.save_image(x_gen * 0.5 + 0.5, save_path)
-                #
-                # end_sample_time = time.time()
-                #
-                # # Get the reward
-                # reward = self.reward_model.score(self.prompt, save_path)
-                #
-                # end_reward_time = time.time()
-                # print(f"Step {self.step} - Reward: {reward:.4f}, Saved to: {save_path}, Time for sampling: {end_sample_time - start_sample_time:.4f} seconds, Time for reward: {end_reward_time - end_sample_time:.4f} seconds")
-                #
+                # Using Critic to evaluate
+                with th.no_grad():
+                    reward = self.critic(model_output)
+                end_critic_time = time.time()
                 # reward = th.tensor(reward).to(dist_util.dev())
+                print(f"Step {self.step} - Critic Reward: {reward:.4f}, Time for critic: {end_critic_time - start_critic_time:.4f} seconds")
 
-                # if self.RL:
-                #     loss = loss + self.alpha * reward.mean()
+                loss = loss + self.alpha * reward
+                # loss = (1 - self.alpha) * loss + self.alpha * reward
+
+                if self.step % 100 == 0: # train the critic every 100 steps
+                    self.critic.train()
+                    
+                    critic_losses = []
+                    for i in range(10): # train step
+                        x_t = th.randn((1, 3, self.rl_H, self.rl_W), device=dist_util.dev())
+                        with th.no_grad():
+                            model_output = self.ddp_model(x_t, t, **model_kwargs)
+
+                        predicted_reward = self.critic(model_output)
+
+                        # Generate and save a complete image
+                        with th.no_grad():
+                            sample = self.diffusion.p_sample_loop(
+                                self.ddp_model,
+                                (1, 3, self.rl_H, self.rl_W),
+                                model_kwargs=model_kwargs,
+                                device=dist_util.dev(),
+                                progress=False,
+                                noise=x_t
+                            )
+                            x_gen = sample[0]
+                        os.makedirs("generated_train_imgs", exist_ok=True)
+                        save_path = f"generated_train_imgs/step_{self.step}_i{i}.png"
+                        vutils.save_image(x_gen * 0.5 + 0.5, save_path)
+
+                        # Get the actual reward
+                        actual_reward = self.reward_model.score(self.prompt, save_path)
+                        actual_reward = th.tensor(actual_reward, dtype=th.float32, device=dist_util.dev())
+
+                        critic_loss = F.mse_loss(predicted_reward, actual_reward)
+                        critic_losses.append(critic_loss)
+
+                        self.critic_optimizer.zero_grad()
+                        critic_loss.backward()
+                        self.critic_optimizer.step()
+                    
+                    # Record the critic loss
+                    avg_critic_loss = sum(critic_losses) / len(critic_losses)
+                    with open(self.critic_losses_file, 'a', newline='') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([self.step, avg_critic_loss.item()])
+
+                    self.critic.eval()
 
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
             )
             self.mp_trainer.backward(loss)
+
+            if self.step % 1000 == 0:  # show the evaluation results every 1000 steps
+                for i in range(5):  # train step
+                    model_kwargs={}
+                    # Generate and save a complete image
+                    with th.no_grad():
+                        sample = self.diffusion.p_sample_loop(
+                            self.ddp_model,
+                            (1, 3, curr_h, curr_w),
+                            model_kwargs=model_kwargs,
+                            device=dist_util.dev(),
+                            progress=False,
+                        )
+                        x_gen = sample[0]
+                    os.makedirs(f"evaluation_imgs_RL_{self.RL}", exist_ok=True)
+                    save_path = f"evaluation_imgs_RL_{self.RL}/step_{self.step}.png"
+                    vutils.save_image(x_gen * 0.5 + 0.5, save_path)
 
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -304,9 +355,9 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    filename = f"model{(self.step+self.resume_step):06d}.pt"
+                    filename = f"model{(self.step + self.resume_step):06d}.pt"
                 else:
-                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+                    filename = f"ema_{rate}_{(self.step + self.resume_step):06d}.pt"
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
                     th.save(state_dict, f)
 
@@ -316,8 +367,8 @@ class TrainLoop:
 
         if dist.get_rank() == 0:
             with bf.BlobFile(
-                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
-                "wb",
+                    bf.join(get_blob_logdir(), f"opt{(self.step + self.resume_step):06d}.pt"),
+                    "wb",
             ) as f:
                 th.save(self.opt.state_dict(), f)
 
