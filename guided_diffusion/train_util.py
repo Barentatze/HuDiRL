@@ -10,7 +10,6 @@ import blobfile as bf
 import torch as th
 import torch.distributed as dist
 import torch.nn.functional as F
-from timm.models import AvgPool2dSame
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from mpi4py import MPI
