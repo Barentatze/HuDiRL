@@ -26,7 +26,7 @@ conda activate SinDiffusion
 sudo apt update
 sudo apt install -y libopenmpi-dev openmpi-bin
 
-conda install mpi4py
+conda install -y mpi4py
 
 # Install related dependencies
 pip install -r requirements.txt
