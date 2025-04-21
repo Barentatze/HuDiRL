@@ -8,3 +8,5 @@ blobfile~=3.0.0
 mpi4py~=3.1.4
 opencv-python~=4.11.0.86
 tensorflow-probability~=0.25.0
+image-reward
+clip
