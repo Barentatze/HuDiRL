@@ -289,7 +289,7 @@ class TrainLoop:
                             )
                             x_gen = sample[0]
                         os.makedirs("generated_train_imgs", exist_ok=True)
-                        save_path = f"generated_train_imgs/step_{self.step}_i{i}.png"
+                        save_path = f"generated_train_imgs/step_{self.step}_{i}.png"
                         vutils.save_image(x_gen * 0.5 + 0.5, save_path)
 
                         # Get the actual reward
