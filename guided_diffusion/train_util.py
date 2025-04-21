@@ -271,6 +271,7 @@ class TrainLoop:
                     
                     critic_losses = []
                     for i in range(10): # train step
+                        start_training_time = time.time()
                         x_t = th.randn((1, 3, self.rl_H, self.rl_W), device=dist_util.dev())
                         with th.no_grad():
                             model_output = self.ddp_model(x_t, t, **model_kwargs)
@@ -296,8 +297,12 @@ class TrainLoop:
                         actual_reward = self.reward_model.score(self.prompt, save_path)
                         actual_reward = th.tensor(actual_reward, dtype=th.float32, device=dist_util.dev())
 
+                        end_training_time = time.time()
+
                         critic_loss = F.mse_loss(predicted_reward, actual_reward)
                         critic_losses.append(critic_loss)
+
+                        print(f"Step {self.step}_{i} - Critic Reward: {reward:.4f}, Time for training: {end_training_time - start_training_time:.4f} seconds")
 
                         self.critic_optimizer.zero_grad()
                         critic_loss.backward()
