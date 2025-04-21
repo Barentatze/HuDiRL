@@ -301,7 +301,7 @@ class TrainLoop:
                         critic_loss = F.mse_loss(predicted_reward, actual_reward)
                         critic_losses.append(critic_loss.item())
 
-                        print(f"Step {self.step}_{i} - Critic Loss: {critic_loss.item():.4f}, Time for training: {end_training_time - start_training_time:.4f} seconds")
+                        print(f"Train Step {self.step}_{i} - Critic Loss: {actual_reward.item():.4f} - {predicted_reward.item():.4f} = {critic_loss.item():.4f}, Time for training: {end_training_time - start_training_time:.4f} seconds")
 
                         self.critic_optimizer.zero_grad()
                         critic_loss.backward()
