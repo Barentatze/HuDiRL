@@ -235,37 +235,47 @@ class TrainLoop:
 
             model_kwargs = {}
 
-            if self.step > 5000 and self.step % 100 == 0:
-            # if self.RL:
+            # if self.step > 5000 and self.step % 100 == 0:
+            if self.RL:
+                timestep = 50
+                H, W = 32, 32
+                t = th.tensor([timestep], device=dist_util.dev())
+                x_t = th.randn((1, 3, H, W), device=dist_util.dev())
+                model_kwargs = {}
 
-                start_sample_time = time.time()
-
-                # Generate and save a complete image
                 with th.no_grad():
-                    sample = self.diffusion.p_sample_loop(
-                        self.ddp_model,
-                        (1, 3, curr_h, curr_w),
-                        model_kwargs=model_kwargs,
-                        device=dist_util.dev(),
-                        progress=False
-                    )
-                    x_gen = sample[0]
-                os.makedirs("generated_imgs", exist_ok=True)
-                save_path = f"generated_imgs/step_{self.step}.png"
-                vutils.save_image(x_gen * 0.5 + 0.5, save_path)
+                    model_output = self.ddp_model(x_t, t, **model_kwargs)
 
-                end_sample_time = time.time()
+                print(model_output.shape)
 
-                # Get the reward
-                reward = self.reward_model.score(self.prompt, save_path)
+                # start_sample_time = time.time()
+                #
+                # # Generate and save a complete image
+                # with th.no_grad():
+                #     sample = self.diffusion.p_sample_loop(
+                #         self.ddp_model,
+                #         (1, 3, curr_h, curr_w),
+                #         model_kwargs=model_kwargs,
+                #         device=dist_util.dev(),
+                #         progress=False
+                #     )
+                #     x_gen = sample[0]
+                # os.makedirs("generated_imgs", exist_ok=True)
+                # save_path = f"generated_imgs/step_{self.step}.png"
+                # vutils.save_image(x_gen * 0.5 + 0.5, save_path)
+                #
+                # end_sample_time = time.time()
+                #
+                # # Get the reward
+                # reward = self.reward_model.score(self.prompt, save_path)
+                #
+                # end_reward_time = time.time()
+                # print(f"Step {self.step} - Reward: {reward:.4f}, Saved to: {save_path}, Time for sampling: {end_sample_time - start_sample_time:.4f} seconds, Time for reward: {end_reward_time - end_sample_time:.4f} seconds")
+                #
+                # reward = th.tensor(reward).to(dist_util.dev())
 
-                end_reward_time = time.time()
-                print(f"Step {self.step} - Reward: {reward:.4f}, Saved to: {save_path}, Time for sampling: {end_sample_time - start_sample_time:.4f} seconds, Time for reward: {end_reward_time - end_sample_time:.4f} seconds")
-
-                reward = th.tensor(reward).to(dist_util.dev())
-
-                if self.RL:
-                    loss = loss + self.alpha * reward.mean()
+                # if self.RL:
+                #     loss = loss + self.alpha * reward.mean()
 
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
