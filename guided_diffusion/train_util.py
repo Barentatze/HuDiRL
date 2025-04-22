@@ -337,7 +337,7 @@ class TrainLoop:
                         )
                         x_gen = sample[0]
                     os.makedirs(f"evaluation_imgs_RL_{self.RL}", exist_ok=True)
-                    save_path = f"evaluation_imgs_RL_{self.RL}/step_{self.step}.png"
+                    save_path = f"evaluation_imgs_RL_{self.RL}/step_{self.step}_{i}.png"
                     vutils.save_image(x_gen * 0.5 + 0.5, save_path)
 
     def _update_ema(self):
