@@ -25,7 +25,7 @@ import torch.nn as nn
 import torchvision.models as models
 
 class RewardPredictor(nn.Module):
-    def __init__(self):
+    def __init__(self, Pool2dSize=4):
         super(RewardPredictor, self).__init__()
         # 加载 ResNet18，不加载预训练参数（你可以设为 pretrained=True）
         self.resnet = models.resnet18(pretrained=False)
