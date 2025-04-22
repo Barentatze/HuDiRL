@@ -51,8 +51,8 @@ class TrainLoop:
             using_rl=True,
             alpha=0.1,
             rl_Pool2dSize=16,
-            rl_H=128,
-            rl_W=128,
+            # rl_H=128,
+            # rl_W=128,
     ):
         self.critic_losses_file = "critic_losses.csv"
         self.model = model
@@ -81,7 +81,7 @@ class TrainLoop:
         self.RL = using_rl
         self.alpha = alpha
         self.timestep = 50
-        self.rl_H, self.rl_W = rl_H, rl_W
+        # self.rl_H, self.rl_W = rl_H, rl_W
         self.critic = RewardPredictor(Pool2dSize=rl_Pool2dSize)
         self.critic_optimizer = th.optim.Adam(self.critic.parameters(), lr=1e-4)
 
@@ -249,7 +249,8 @@ class TrainLoop:
                 self.critic.eval()
                 start_critic_time = time.time()
                 t = th.tensor([self.timestep], device=dist_util.dev())
-                x_t = th.randn((1, 3, self.rl_H, self.rl_W), device=dist_util.dev())
+                # x_t = th.randn((1, 3, self.rl_H, self.rl_W), device=dist_util.dev())
+                x_t = th.randn((1, 3, curr_h, curr_w), device=dist_util.dev())
                 model_kwargs = {}
 
                 with th.no_grad():
@@ -271,7 +272,8 @@ class TrainLoop:
                     critic_losses = []
                     for i in range(10): # train step
                         start_training_time = time.time()
-                        x_t = th.randn((1, 3, self.rl_H, self.rl_W), device=dist_util.dev())
+                        # x_t = th.randn((1, 3, self.rl_H, self.rl_W), device=dist_util.dev())
+                        x_t = th.randn((1, 3, curr_h, curr_w), device=dist_util.dev())
                         with th.no_grad():
                             model_output = self.ddp_model(x_t, t, **model_kwargs)
 
@@ -281,7 +283,8 @@ class TrainLoop:
                         with th.no_grad():
                             sample = self.diffusion.p_sample_loop(
                                 self.ddp_model,
-                                (1, 3, self.rl_H, self.rl_W),
+                                # (1, 3, self.rl_H, self.rl_W),
+                                (1, 3, curr_h, curr_w),
                                 model_kwargs=model_kwargs,
                                 device=dist_util.dev(),
                                 progress=False,
