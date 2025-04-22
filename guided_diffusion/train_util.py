@@ -49,7 +49,7 @@ class TrainLoop:
             weight_decay=0.0,
             lr_anneal_steps=0,
             using_rl=True,
-            alpha=0.5,
+            alpha=0.3,
             rl_Pool2dSize=16,
             rl_H=128,
             rl_W=128,
@@ -94,7 +94,7 @@ class TrainLoop:
             fp16_scale_growth=fp16_scale_growth,
         )
         self.reward_model = RewardModel.load("ImageReward-v1.0")
-        self.prompt = "a photo of john curtin school of medical research"
+        self.prompt = "a building on stairs"
 
         self.opt = AdamW(
             self.mp_trainer.master_params, lr=self.lr, weight_decay=self.weight_decay
@@ -262,7 +262,7 @@ class TrainLoop:
                 # reward = th.tensor(reward).to(dist_util.dev())
                 print(f"Step {self.step} - Critic Reward: {reward.item():.4f}, Time for critic: {end_critic_time - start_critic_time:.4f} seconds")
 
-                loss = loss + self.alpha * reward
+                # loss = loss + self.alpha * reward
                 # loss = (1 - self.alpha) * loss + self.alpha * reward
 
                 if self.step % 100 == 0: # train the critic every 100 steps
