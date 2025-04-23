@@ -318,10 +318,11 @@ class TrainLoop:
                         self.critic_optimizer.step()
                     
                     # Record the critic loss
-                    avg_critic_loss = sum(critic_losses) / len(critic_losses)
-                    with open(self.critic_losses_file, 'a', newline='') as f:
-                        writer = csv.writer(f)
-                        writer.writerow([self.step, avg_critic_loss])
+                    if self.is_rank0():
+                        avg_critic_loss = sum(critic_losses) / len(critic_losses)
+                        with open(self.critic_losses_file, 'a', newline='') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([self.step, avg_critic_loss])
 
                     self.critic.eval()
 
