@@ -201,6 +201,9 @@ class TrainLoop:
         # self._anneal_lr()
         self.log_step()
 
+    def is_rank0(self):
+        return not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0
+
     def forward_backward(self, batch, cond):
         self.mp_trainer.zero_grad()
         self.critic.to(dist_util.dev())
@@ -261,7 +264,8 @@ class TrainLoop:
                     reward = self.critic(model_output)
                 end_critic_time = time.time()
                 # reward = th.tensor(reward).to(dist_util.dev())
-                print(f"Step {self.step} - Critic Reward: {reward.item():.4f}, Time for critic: {end_critic_time - start_critic_time:.4f} seconds")
+                if self.is_rank0:
+                    print(f"Step {self.step} - Critic Reward: {reward.item():.4f}, Time for critic: {end_critic_time - start_critic_time:.4f} seconds")
 
                 loss = loss - self.alpha * reward
                 # loss = (1 - self.alpha) * loss + self.alpha * reward
@@ -292,7 +296,9 @@ class TrainLoop:
                             )
                             x_gen = sample[0]
                         os.makedirs("generated_train_imgs", exist_ok=True)
-                        save_path = f"generated_train_imgs/step_{self.step}_{i}.png"
+                        # save_path = f"generated_train_imgs/step_{self.step}_{i}.png"
+                        rank = dist.get_rank() if dist.is_initialized() else 0
+                        save_path = f"generated_train_imgs/step_{self.step}_{i}_rank{rank}.png"
                         vutils.save_image(x_gen * 0.5 + 0.5, save_path)
 
                         # Get the actual reward
@@ -304,7 +310,8 @@ class TrainLoop:
                         critic_loss = F.mse_loss(predicted_reward, actual_reward)
                         critic_losses.append(critic_loss.item())
 
-                        print(f"Train Step {self.step}_{i} - Critic Loss: mse({actual_reward.item():.4f} - {predicted_reward.item():.4f}) = {critic_loss.item():.4f}, Time for training: {end_training_time - start_training_time:.4f} seconds")
+                        if self.is_rank0:
+                            print(f"Train Step {self.step}_{i} - Critic Loss: mse({actual_reward.item():.4f} - {predicted_reward.item():.4f}) = {critic_loss.item():.4f}, Time for training: {end_training_time - start_training_time:.4f} seconds")
 
                         self.critic_optimizer.zero_grad()
                         critic_loss.backward()
