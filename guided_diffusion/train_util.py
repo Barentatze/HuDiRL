@@ -330,7 +330,7 @@ class TrainLoop:
             )
             self.mp_trainer.backward(loss)
 
-            if self.step % 1000 == 0:  # show the evaluation results every 1000 steps
+            if self.step % 1000 == 0 and self.is_rank0():  # show the evaluation results every 1000 steps
                 for i in range(5):  # train step
                     model_kwargs={}
                     # Generate and save a complete image
