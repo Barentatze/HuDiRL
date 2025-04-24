@@ -1,6 +1,12 @@
 # HuDiRL: Human-Guided Diffusion via Reinforcement Learning for Single-Image Generation
 
 
+## Setting up Environment
+To setup the enviroment, execute the following command:
+```bash
+source setup.sh
+```
+
 ## Training the model
 To train the model, execute the training scripts in the scripts folder or the following command. 
 ```bash
@@ -12,7 +18,7 @@ mpiexec -n 8 python image_train.py --data_dir data/yourimage.png --lr 5e-4 --dif
                                    --use_scale_shift_norm True --use_checkpoint True --batch_size 16
 ```
 The experimental results are then saved in the folder ./OUTPUT/sinddpm-(yourimage)-(day)-(commitseq).
-Training on 8 NVIDIA Tesla V100 is recommended. 
+Training on 1 NVIDIA Tesla H100 is recommended. 
 
 ## Testing the model
 To test a trained model, execute the testing scripts in the scripts folder or the following command. 
