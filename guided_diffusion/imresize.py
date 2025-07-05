@@ -21,6 +21,14 @@ def move_to_gpu(t):
     return t
 
 def np2torch(x,opt):
+
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
+
     if opt.nc_im == 3:
         x = x[:,:,:,None]
         x = x.transpose((3, 2, 0, 1))/255
@@ -29,8 +37,9 @@ def np2torch(x,opt):
         x = x[:,:,None,None]
         x = x.transpose(3, 2, 0, 1)
     x = torch.from_numpy(x)
-    x = move_to_gpu(x)
-    x = x.type(torch.cuda.FloatTensor)
+    # x = move_to_gpu(x)
+    # x = x.type(torch.cuda.FloatTensor)
+    x = x.to(device, dtype=torch.float)
     x = norm(x)
     return x
 
